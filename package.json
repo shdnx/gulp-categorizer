@@ -1,0 +1,19 @@
+{
+  "name": "gulp-categorizer",
+  "version": "0.0.1",
+  "description": "Implicitly categorize your gulp tasks by their name.",
+  "author": "Gábor Kozár <id@gaborkozar.me>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shdnx/gulp-categorizer"
+  },
+  "bugs": {
+    "url": "https://github.com/shdnx/gulp-categorizer/issues"
+  },
+  "keywords": [
+    "gulp"
+  ],
+  "dependencies": {},
+  "main": "src/main.js",
+  "license": "MIT"
+}
