@@ -1,6 +1,6 @@
 {
   "name": "gulp-categorizer",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "Implicitly categorize your gulp tasks by their name.",
   "author": "Gábor Kozár <npm@gaborkozar.me>",
   "repository": {
