@@ -1,29 +1,43 @@
 'use strict';
 
+var gutil = require('gulp-util');
+
 module.exports = function(gulp, options) {
-  if (!gulp) {
-    console.error('gulp-categorizer: missing gulp object!');
-    return null;
-  }
+  if (!gulp)
+    throw new Error('gulp-categorizer: expected gulp object as the first parameter!');
 
   // save the gulp.task function, as the user will probably overwrite it
-  const _gulpTask = gulp.task;
+  var _gulpTask = gulp.task;
 
   if (!options) options = {};
-  const categorySeparator = options.categorySeparator || ':';
+  var debug = options.debug || false;
+  var categorySeparator = options.categorySeparator || ':';
 
   // Used as a map to map category names to the array of task names that belong to that category.
-  let taskCategoryMap = {};
+  var taskCategoryMap = {};
 
   // A list to keep track of gulp tasks registered. Used to verify that a task registered earlier is not used as a category name later.
-  let taskNames = [];
+  var taskNames = [];
 
-  const gulpCategorizer = {};
+  // A flag indicating whether makeImplicitTasks() has been called. Used for sanity checks.
+  var madeImplicitTasks = false;
+
+  var gulpCategorizer = {};
+
+  function log(message) {
+    if (!debug) return;
+
+    gutil.log('[gulp-categorizer]', gutil.colors.gray.dim('Debug: ' + message));
+  }
+
+  function warn(message) {
+    gutil.log('[gulp-categorizer]', gutil.colors.red('Warning: ' + message));
+  }
 
   // Gets the name of the category task that contains the task with the specified name.
   // E.g. for "a:b:c" it will return "a:b".
   gulpCategorizer.getTaskCategoryName = function(taskName) {
-    let index = taskName.lastIndexOf(categorySeparator);
+    var index = taskName.lastIndexOf(categorySeparator);
 
     if (index === -1) return null;
     else return taskName.substring(0, index);
@@ -32,8 +46,8 @@ module.exports = function(gulp, options) {
   // Gets all category names that the task with the specified name belongs to.
   // E.g. for "a:b:c" it will return [ "a", "a:b" ].
   gulpCategorizer.getAllTaskCategoryNames = function(taskName) {
-    let index = taskName.indexOf(categorySeparator);
-    let categories = [];
+    var index = taskName.indexOf(categorySeparator);
+    var categories = [];
 
     while (index !== -1) {
       categories.push(taskName.substring(0, index));
@@ -55,11 +69,15 @@ module.exports = function(gulp, options) {
       taskCategoryMap[categoryName].push(taskName);
     else return false;
 
+    log('Task "' + taskName + '" added to category "' + categoryName + '"');
     return true;
   };
 
   // Drop-in replacement for gulp.task.
   gulpCategorizer.task = function(taskName, dependencies, func) {
+    if (madeImplicitTasks)
+      warn('gulp task "' + taskName + '" created after a call to makeImplicitTasks(): call makeImplicitTasks() at the end of your gulp script.');
+
     if (typeof dependencies === 'function') {
       func = dependencies;
       dependencies = [];
@@ -69,15 +87,16 @@ module.exports = function(gulp, options) {
     // if so, merge dependencies and remove the category
     if (typeof taskCategoryMap[taskName] !== 'undefined') {
       dependencies = dependencies.concat(taskCategoryMap[taskName]);
+      log('Automatically injected dependencies for explicit category task "' + taskName + '": ' + JSON.stringify(taskCategoryMap[taskName]));
       delete taskCategoryMap[taskName];
     }
 
-    const taskCategories = gulpCategorizer.getAllTaskCategoryNames(taskName);
-    let currentCategory = null;
+    var taskCategories = gulpCategorizer.getAllTaskCategoryNames(taskName);
+    var currentCategory = null;
 
-    let i = 0;
+    var i = 0;
     while (i < taskCategories.length) {
-      const category = taskCategories[i];
+      var category = taskCategories[i];
 
       if (currentCategory !== null)
         gulpCategorizer.addTaskToCategory(currentCategory, category);
@@ -95,11 +114,26 @@ module.exports = function(gulp, options) {
 
   // Create gulp.task()s out of any implicit categories.
   // For example, if we had the tasks 'js:foo', 'js:bar', 'css:blah' and 'js', then this will create the gulp task 'css', with 'css:blah' as its only dependency.
-  gulpCategorizer.makeCategoryTasks = function() {
-    for (let category in taskCategoryMap) {
+  gulpCategorizer.makeImplicitTasks = function() {
+    if (madeImplicitTasks)
+      warn('duplicate call to makeImplicitTasks(): only call this function once, at the end of your gulp script.');
+
+    for (var category in taskCategoryMap) {
       _gulpTask.call(gulp, category, taskCategoryMap[category]);
+      log('Created implicit category task "' + category + '" with dependencies: ' + JSON.stringify(taskCategoryMap[category]));
     }
+
+    madeImplicitTasks = true;
   };
+
+  process.on('exit', function() {
+    if (!madeImplicitTasks) {
+      warn('No call to makeImplicitTasks() was made, so no implicit categories were created!');
+      warn('The following implicit categories were not created:');
+      for (var category in taskCategoryMap)
+        warn(' - "' + category + '" with dependencies: ' + JSON.stringify(taskCategoryMap[category]));
+    }
+  });
 
   return gulpCategorizer;
 };

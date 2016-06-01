@@ -13,7 +13,9 @@
   "keywords": [
     "gulp"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "gulp-util": "^3.0.7"
+  },
   "main": "src/main.js",
   "license": "MIT"
 }
